@@ -1,0 +1,6 @@
+# - Pycharm files
+.idea/
+__pycache__/
+
+# - Pipenv
+Pipfile.lock
