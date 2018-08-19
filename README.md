@@ -37,13 +37,13 @@ To see the full syntax guide see the wiki for this repo.
 | array         | [expression, ...] | ArrayBox     |
 
 ### Operators
-| Name          | Syntax                  | Description                                      |
-| ------------- |:------------------------|:------------------------------------------------ |
-| sum           | type + type             | Sum two values                                   |
-| sub           | type - type             | Subtract two values                              |
-| mul           | type * type             | Multiply two values                              |
-| div           | type / type             | Divide two values                                |
-| int div       | type // type            | Integer part of the division                     |
-| append        | type :: type            | Makes an array merging two values                |
-| dice roll     | <v0>d<v1> (Es. 2d20)    | Throws v0 number of dices with v1 faces          | 
-| dice roll arr | <v0>[d]<v1> (Es 2[d]20) | Same as previous but each dice is an array field |
+| Name          | Syntax                      | Description                                      |
+| ------------- |:----------------------------|:------------------------------------------------ |
+| sum           | type + type                 | Sum two values                                   |
+| sub           | type - type                 | Subtract two values                              |
+| mul           | type * type                 | Multiply two values                              |
+| div           | type / type                 | Divide two values                                |
+| int div       | type // type                | Integer part of the division                     |
+| append        | type :: type                | Makes an array merging two values                |
+| dice roll     | \<v0\>d\<v1\> (Es. 2d20)    | Throws v0 number of dices with v1 faces          | 
+| dice roll arr | \<v0\>[d]\<v1\> (Es 2[d]20) | Same as previous but each dice is an array field |
