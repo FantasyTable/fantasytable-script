@@ -42,6 +42,9 @@ class RollBox:
 
         return ret
 
+    def __neg__(self):
+        return -sum(self.value)
+
     def __add__(self, other):
         from .floatingbox import FloatingBox
         from .integerbox import IntegerBox
@@ -126,6 +129,37 @@ class RollBox:
 
         if type(other) == ArrayBox:
             return IntegerBox(sum(self.value)) // other
+
+    def __lt__(self, other):
+        from .floatingbox import FloatingBox
+        from .booleanbox import BooleanBox
+        from .integerbox import IntegerBox
+        from .arraybox import ArrayBox
+        from .rollbox import RollBox
+
+        if type(other) == RollBox or type(other) == FloatingBox or type(other) == IntegerBox:
+            return BooleanBox(sum(self.value) < other.value)
+
+        if type(other) == ArrayBox:
+            ret = ArrayBox()
+            for i in range(0, len(self.value)):
+                ret.append(other < self.value[i])
+            return ret
+
+    def __eq__(self, other):
+        return (self < other).inv().andOp((other < self).inv())
+
+    def __ne__(self, other):
+        return (self < other).orOp(other < self)
+
+    def __gt__(self, other):
+        return other < self
+
+    def __ge__(self, other):
+        return (self < other).inv()
+
+    def __le__(self, other):
+        return (other < self).inv()
 
     def __repr__(self):
 

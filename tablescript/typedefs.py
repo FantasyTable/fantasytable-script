@@ -1,5 +1,6 @@
 from .datatypes.floatingbox import *
 from .datatypes.integerbox import *
+from .datatypes.booleanbox import *
 from .datatypes.arraybox import *
 from .datatypes.rollbox import *
 from .scope import *
@@ -25,6 +26,7 @@ def convertType(value):
 
     return Scope(value)
 
+
 class TerminalExpression:
 
     grammar = None
@@ -49,7 +51,7 @@ class Expression:
 
 class Label:
 
-    grammar = re.compile(r'[a-ce-zA-Z]\w*')
+    grammar = re.compile(r'(?!true|True|false|False)([a-ce-zA-Z]\w*)')
 
     def __init__(self, exp):
         self.exp = exp
@@ -71,6 +73,23 @@ class Number:
 
     def evaluate(self, scope):
         return ({ "type": "number", "value": int(self.exp) }, IntegerBox(self.exp))
+
+
+class Boolean:
+
+    grammar = re.compile(r'true|false|True|False')
+
+    def __init__(self, exp):
+        self.exp = exp
+
+    def evaluate(self, scope):
+        value = False
+        if self.exp == "true" or self.exp == "True":
+            value = True
+        else:
+            value = False
+
+        return {"type": "boolean", "value": value}, BooleanBox(value)
 
 
 class Decimal:

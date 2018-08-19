@@ -127,5 +127,39 @@ class IntegerBox:
         if type(other) == IntegerBox:
             return IntegerBox(self.value // other.value)
 
+    def __lt__(self, other):
+        from .floatingbox import FloatingBox
+        from .booleanbox import BooleanBox
+        from .arraybox import ArrayBox
+        from .rollbox import RollBox
+
+        if type(other) == IntegerBox or type(other) == FloatingBox:
+            return BooleanBox(self.value < other.value)
+
+        if type(other) == RollBox:
+            val = sum(other.value)
+            return BooleanBox(self.value < val)
+
+        if type(other) == ArrayBox:
+            ret = ArrayBox()
+            for i in range(0, len(self.value)):
+                ret.append(BooleanBox(self.other < self.value[i]))
+            return ret
+
+    def __eq__(self, other):
+        return (self < other).inv().andOp((other < self).inv())
+
+    def __ne__(self, other):
+        return (self < other).orOp(other < self)
+
+    def __gt__(self, other):
+        return other < self
+
+    def __ge__(self, other):
+        return (self < other).inv()
+
+    def __le__(self, other):
+        return (other < self).inv()
+
     def __repr__(self):
         return str(self.value)

@@ -6,8 +6,21 @@ from .operators import *
 from .scope import *
 
 
-TerminalExpression.grammar = [MemberAccess, RollOperator, ArrayRoll, Roll, Decimal, Number, Label, Array, Parenthesis]
-Expression.grammar = SumSub
+TerminalExpression.grammar = \
+	[
+		MemberAccess,
+		RollOperator,
+		ArrayRoll,
+		Roll,
+		Decimal,
+		Number,
+		Boolean,
+		Label,
+		Array,
+		Parenthesis
+	]
+
+Expression.grammar = BoolLogic
 
 
 class TableLanguage:
