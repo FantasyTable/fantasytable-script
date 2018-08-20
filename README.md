@@ -36,6 +36,7 @@ To see the full syntax guide see the wiki for this repo.
 | diceroll      | <2d20\| 4, 17>    | RollBox      |
 | array         | [expression, ...] | ArrayBox     |
 | boolean       | true or false     | BooleanBox   |
+| string        | "text"            | StringBox    |
 
 ### Operators
 | Name          | Syntax                            | Description                                                       |
@@ -59,3 +60,4 @@ To see the full syntax guide see the wiki for this repo.
 ## TODO list
 
 - [ ] A good exceptions handling
+- [ ] More precise syntax error report
