@@ -52,6 +52,9 @@ To see the full syntax guide see the wiki for this repo.
 | compare       | type >, <, >=, <=, ==, != type    | Less than, Greater than, LessEqual, GreaterEqual, Equal, NotEqual |
 | dice roll     | \<v0\>d\<v1\> (Es. 2d20)          | Throws v0 number of dices with v1 faces                           | 
 | dice roll arr | \<v0\>[d]\<v1\> (Es 2[d]20)       | Same as previous but each dice is an array field                  |
+| label         | a label can't start with numbers  | Check in the scope if there's a variable with this name getting the value |
+| access        | label.label                       | Access to a struct field by label name                            |
+| index         | [2] or [1:3] or [2:] or [:2]      | Get a value or a slice of array                                   |
 
 ## TODO list
 
