@@ -37,7 +37,6 @@ class FloatingBox:
             ret = ArrayBox(other.value)
             for i in range(0, len(ret.value)):
                 ret.value[i] = ret.value[i] + self
-                print(ret.value[i])
             return ret
 
         if type(other) == FloatingBox:
@@ -58,7 +57,6 @@ class FloatingBox:
             ret = ArrayBox(other.value)
             for i in range(0, len(ret.value)):
                 ret.value[i] = ret.value[i] - self
-                print(ret.value[i])
             return ret
 
         if type(other) == FloatingBox:
@@ -79,7 +77,6 @@ class FloatingBox:
             ret = ArrayBox(other.value)
             for i in range(0, len(ret.value)):
                 ret.value[i] = ret.value[i] * self
-                print(ret.value[i])
             return ret
 
         if type(other) == FloatingBox:
@@ -100,7 +97,6 @@ class FloatingBox:
             ret = ArrayBox(other.value)
             for i in range(0, len(ret.value)):
                 ret.value[i] = ret.value[i] / self
-                print(ret.value[i])
             return ret
 
         if type(other) == FloatingBox:
@@ -121,7 +117,6 @@ class FloatingBox:
             ret = ArrayBox(other.value)
             for i in range(0, len(ret.value)):
                 ret.value[i] = ret.value[i] // self
-                print(ret.value[i])
             return ret
 
         if type(other) == FloatingBox:

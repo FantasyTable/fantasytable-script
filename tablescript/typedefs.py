@@ -1,6 +1,7 @@
 from .datatypes.floatingbox import *
 from .datatypes.integerbox import *
 from .datatypes.booleanbox import *
+from .datatypes.stringbox import *
 from .datatypes.arraybox import *
 from .datatypes.rollbox import *
 from .scope import *
@@ -12,20 +13,30 @@ import re
 
 def convertType(value):
 
+    """ Convert a standard python type to a boxed type.
+
+    :param value: Original value.
+    :return: Boxed value.
+    """
+
     if type(value) == int:
         return IntegerBox(value)
+
     elif type(value) == float:
         return FloatingBox(value)
+
     elif type(value) == list:
         values = []
-
         for i in range(0, len(value)):
             values.append(convertType(value[i]))
-
         return ArrayBox
 
     return Scope(value)
 
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 
 class TerminalExpression:
 
@@ -48,6 +59,10 @@ class Expression:
     def evaluate(self, scope):
         return self.exp.evaluate(scope)
 
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 
 class Label:
 
@@ -58,10 +73,27 @@ class Label:
 
     def evaluate(self, scope):
 
-        value = scope.value[self.exp]
-        converted = convertType(value)
+        try:
+            value = scope.value[self.exp]
+            converted = convertType(value)
 
-        return ({ "type": "label", "name": self.exp, "value": value }, converted)
+            return { "type": "label", "name": self.exp, "value": value }, converted
+
+        except Exception:
+            raise LookupError("Identifier not found for: " + self.exp)
+
+
+class String:
+
+    grammar = re.compile(r'\"(\\.|[^\\"])*\"')
+
+    def __init__(self, exp):
+        self.exp = exp
+
+    def evaluate(self, scope):
+        value = self.exp[1:-1]
+        return { "type": "label", "value": value }, StringBox(value)
+        
 
 
 class Number:
@@ -72,7 +104,7 @@ class Number:
         self.exp = exp
 
     def evaluate(self, scope):
-        return ({ "type": "number", "value": int(self.exp) }, IntegerBox(self.exp))
+        return { "type": "number", "value": int(self.exp) }, IntegerBox(self.exp)
 
 
 class Boolean:
@@ -100,7 +132,7 @@ class Decimal:
         self.exp = exp
 
     def evaluate(self, scope):
-        return ({ "type": "decimal", "value": float(self.exp) }, FloatingBox(self.exp))
+        return { "type": "decimal", "value": float(self.exp) }, FloatingBox(self.exp)
 
 
 class Roll:
@@ -119,7 +151,7 @@ class Roll:
         dice = self.exp[1].evaluate(scope)[1]
         rolls = self.exp[0].evaluate(scope)[1]
 
-        return ({"type": "roll", "dice": dice, "value": rolls }, RollBox(rolls, dice, rolls))
+        return {"type": "roll", "dice": dice, "value": rolls }, RollBox(rolls, dice, rolls)
 
 
 class RollOperator:
@@ -135,7 +167,7 @@ class RollOperator:
         v2 = self.exp[1].evaluate(scope)[1]
         value = RollBox(v1, v2)
 
-        return ({"type": "roll", "dice": v2, "value": value.value }, value)
+        return {"type": "roll", "dice": v2, "value": value.value }, value
 
 
 class ArrayRoll:
@@ -155,7 +187,7 @@ class ArrayRoll:
         for i in range(0, len(value.value)):
             trees.append({"type": "roll", "dice": v2, "value": value[i].value })
 
-        return ({"type": "array", "content": trees}, value)
+        return {"type": "array", "content": trees}, value
 
 
 class Array:
@@ -175,4 +207,4 @@ class Array:
             values.append(data[1])
             trees.append(data[0])
 
-        return ({"type": "array", "content": trees}, ArrayBox(values))
+        return {"type": "array", "content": trees}, ArrayBox(values)

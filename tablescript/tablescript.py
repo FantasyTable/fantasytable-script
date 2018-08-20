@@ -7,18 +7,19 @@ from .scope import *
 
 
 TerminalExpression.grammar = \
-	[
-		MemberAccess,
-		RollOperator,
-		ArrayRoll,
-		Roll,
-		Decimal,
-		Number,
-		Boolean,
-		Label,
-		Array,
-		Parenthesis
-	]
+[
+	MemberAccess,
+	RollOperator,
+	ArrayRoll,
+	Roll,
+	Decimal,
+	Number,
+	Boolean,
+	String,
+	Label,
+	Array,
+	Parenthesis
+]
 
 Expression.grammar = BoolLogic
 
