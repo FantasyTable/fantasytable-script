@@ -11,6 +11,8 @@ from pypeg2 import *
 import re
 
 
+validLabels = re.compile(r'(?!\btrue\b|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b)^\b([a-zA-Z]\w*)\b')
+
 def convertType(value):
 
     """ Convert a standard python type to a boxed type.
@@ -31,7 +33,10 @@ def convertType(value):
             values.append(convertType(value[i]))
         return ArrayBox
 
-    return Scope(value)
+    if type(value) == dict:
+        return Scope(value)
+
+    return value
 
 # ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------
@@ -66,7 +71,7 @@ class Expression:
 
 class Label:
 
-    grammar = re.compile(r'(?!true|True|false|False)([a-ce-zA-Z]\w*)')
+    grammar = validLabels
 
     def __init__(self, exp):
         self.exp = exp
@@ -154,47 +159,13 @@ class Roll:
         return {"type": "roll", "dice": dice, "value": rolls }, RollBox(rolls, dice, rolls)
 
 
-class RollOperator:
-
-    grammar = Number, "d", Number
-
-    def __init__(self, exp):
-        self.exp = exp
-
-    def evaluate(self, scope):
-
-        v1 = self.exp[0].evaluate(scope)[1]
-        v2 = self.exp[1].evaluate(scope)[1]
-        value = RollBox(v1, v2)
-
-        return {"type": "roll", "dice": v2, "value": value.value }, value
-
-
-class ArrayRoll:
-
-    grammar = Number, "[d]", Number
-
-    def __init__(self, exp):
-        self.exp = exp
-
-    def evaluate(self, scope):
-        v1 = self.exp[0].evaluate(scope)[1]
-        v2 = self.exp[1].evaluate(scope)[1]
-
-        value = RollBox(v1, v2).toArray()
-
-        trees = []
-        for i in range(0, len(value.value)):
-            trees.append({"type": "roll", "dice": v2, "value": value[i].value })
-
-        return {"type": "array", "content": trees}, value
-
-
 class Array:
 
-    grammar = [("[", csl(Expression, separator=","), "]"), "[]"]
+    grammar = [("[", csl(Expression), "]"), "[]"]
 
-    def __init__(self, exp=[]):
+    def __init__(self, exp=None):
+        if exp is None:
+            exp = []
         self.exp = exp
 
     def evaluate(self, scope):

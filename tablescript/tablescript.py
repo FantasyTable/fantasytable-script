@@ -9,8 +9,6 @@ from .scope import *
 TerminalExpression.grammar = \
 [
 	MemberAccess,
-	RollOperator,
-	ArrayRoll,
 	Roll,
 	Decimal,
 	Number,
@@ -21,7 +19,7 @@ TerminalExpression.grammar = \
 	Parenthesis
 ]
 
-Expression.grammar = BoolLogic
+Expression.grammar = ScopeMerge
 
 
 class TableLanguage:

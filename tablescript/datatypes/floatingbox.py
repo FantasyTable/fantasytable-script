@@ -2,7 +2,7 @@
 
 class FloatingBox:
 
-    def __init__(self, init=0):
+    def __init__(self, init):
 
         if type(init) == FloatingBox:
             self.value = init.value

@@ -2,8 +2,10 @@
 
 class ArrayBox:
 
-    def __init__(self, init=[]):
+    def __init__(self, init=None):
 
+        if init is None:
+            init = []
         self.value = init.copy()
 
     def append(self, value):
@@ -155,7 +157,10 @@ class ArrayBox:
         from .integerbox import IntegerBox
         from .rollbox import RollBox
 
-        if type(other) == RollBox or type(other) == FloatingBox or type(other) == IntegerBox or type(other) == BooleanBox:
+        if type(other) == RollBox \
+        or type(other) == FloatingBox \
+        or type(other) == IntegerBox \
+        or type(other) == BooleanBox:
             ret = ArrayBox()
             for i in range(0, len(self.value)):
                 if op == "<":

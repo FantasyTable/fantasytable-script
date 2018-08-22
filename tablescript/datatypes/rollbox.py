@@ -1,5 +1,6 @@
 from numpy import *
 
+
 class RollBox:
 
     def __init__(self, *params):
@@ -29,7 +30,7 @@ class RollBox:
                 self.value = []
 
                 for i in range(0, params[0].value):
-                    self.value.append(random.randint( 1, self.dice + 1))
+                    self.value.append(random.randint(1, self.dice + 1))
 
     def toArray(self):
         from .arraybox import ArrayBox
