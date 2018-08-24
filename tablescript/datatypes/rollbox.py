@@ -138,7 +138,10 @@ class RollBox:
         from .arraybox import ArrayBox
         from .rollbox import RollBox
 
-        if type(other) == RollBox or type(other) == FloatingBox or type(other) == IntegerBox:
+        if type(other) == RollBox:
+            return BooleanBox(sum(self.value) < sum(other.value))
+
+        if type(other) == FloatingBox or type(other) == IntegerBox:
             return BooleanBox(sum(self.value) < other.value)
 
         if type(other) == ArrayBox:

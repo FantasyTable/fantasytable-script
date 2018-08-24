@@ -7,8 +7,7 @@ class BooleanBox:
         if type(init) == BooleanBox:
             self.value = init.value
 
-        elif type(init) == bool:
-            self.value = init
+        self.value = bool(init)
 
     def __get__(self, instance, owner):
         return self.value

@@ -5,38 +5,15 @@ from .datatypes.stringbox import *
 from .datatypes.arraybox import *
 from .datatypes.rollbox import *
 from .scope import *
+from .utils import *
 
 from pypeg2 import *
 
 import re
 
 
-validLabels = re.compile(r'(?!\btrue\b|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b)^\b([a-zA-Z]\w*)\b')
+ValidLabels = re.compile(r'(?!\btrue\b|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b)^\b([a-zA-Z]\w*)\b')
 
-def convertType(value):
-
-    """ Convert a standard python type to a boxed type.
-
-    :param value: Original value.
-    :return: Boxed value.
-    """
-
-    if type(value) == int:
-        return IntegerBox(value)
-
-    elif type(value) == float:
-        return FloatingBox(value)
-
-    elif type(value) == list:
-        values = []
-        for i in range(0, len(value)):
-            values.append(convertType(value[i]))
-        return ArrayBox
-
-    if type(value) == dict:
-        return Scope(value)
-
-    return value
 
 # ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------
@@ -50,8 +27,18 @@ class TerminalExpression:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        return self.exp.evaluate(scope)
+    def generate_tree(self, id_manager):
+        self.exp.generate_tree(id_manager)
+        self.tree = self.exp.tree
+
+    def evaluate(self, scope, options):
+        self.exp.evaluate(scope, options)
+
+        self.stack = self.exp.stack
+        self.result = self.exp.result
+        self.errors = self.exp.errors
+
+        return self
 
 
 class Expression:
@@ -61,8 +48,18 @@ class Expression:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        return self.exp.evaluate(scope)
+    def generate_tree(self, id_manager):
+        self.exp.generate_tree(id_manager)
+        self.tree = self.exp.tree
+
+    def evaluate(self, scope, options):
+        self.exp.evaluate(scope, options)
+
+        self.stack = self.exp.stack
+        self.result = self.exp.result
+        self.errors = self.exp.errors
+
+        return self
 
 # ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------
@@ -71,21 +68,31 @@ class Expression:
 
 class Label:
 
-    grammar = validLabels
+    grammar = ValidLabels
 
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.tree = { "type": "label", "id": self.id }
+
+    def evaluate(self, scope, options):
+
+        self.errors = []
 
         try:
             value = scope.value[self.exp]
-            converted = convertType(value)
+            self.result = convertType(value)
+        except KeyError:
+            desc = "There's no '" + self.exp + "' variable in the scope."
+            self.errors  += [{"description": desc, "id": self.id}]
+            self.result = None
 
-            return { "type": "label", "name": self.exp, "value": value }, converted
+        self.stack = {}
+        self.stack.update({self.id: self.result})
 
-        except Exception:
-            raise LookupError("Identifier not found for: " + self.exp)
+        return self
 
 
 class String:
@@ -95,9 +102,28 @@ class String:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.tree = { "type": "string", "id": self.id }
+
+    def evaluate(self, scope, options):
+
+        self.errors = []
+
         value = self.exp[1:-1]
-        return { "type": "label", "value": value }, StringBox(value)
+
+        try:
+            self.result = StringBox(value)
+
+        except Exception:
+            desc = "Can't convert '" + self.exp + "' to string."
+            self.errors  += [{"description": desc, "id": self.id}]
+            self.result = None
+
+        self.stack = {}
+        self.stack.update({self.id: self.result})
+
+        return self
         
 
 
@@ -108,8 +134,26 @@ class Number:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        return { "type": "number", "value": int(self.exp) }, IntegerBox(self.exp)
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.tree = { "type": "integer", "id": self.id }
+
+    def evaluate(self, scope, options):
+
+        self.errors = []
+
+        try:
+            self.result = IntegerBox(self.exp)
+
+        except Exception:
+            desc = "Can't convert '" + self.exp + "' to integer."
+            self.errors += [{"description": desc, "id": self.id }]
+            self.result = None
+
+        self.stack = {}
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Boolean:
@@ -119,14 +163,24 @@ class Boolean:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        value = False
-        if self.exp == "true" or self.exp == "True":
-            value = True
-        else:
-            value = False
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.tree = { "type": "boolean", "id": self.id }
 
-        return {"type": "boolean", "value": value}, BooleanBox(value)
+    def evaluate(self, scope, options):
+
+        self.errors = []
+
+        self.result = BooleanBox(False)
+        if self.exp == "true" or self.exp == "True":
+            self.result = BooleanBox(True)
+        else:
+            self.result = BooleanBox(False)
+
+        self.stack = {}
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Decimal:
@@ -136,8 +190,26 @@ class Decimal:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        return { "type": "decimal", "value": float(self.exp) }, FloatingBox(self.exp)
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.tree = { "type": "decimal", "id": self.id }
+
+    def evaluate(self, scope, options):
+
+        self.errors = []
+
+        try:
+            self.result = FloatingBox(self.exp)
+
+        except Exception:
+            desc = "Can't convert '" + self.exp + "' to decimal."
+            self.errors += [{"description": desc, "id": self.id }]
+            self.result = None
+
+        self.stack = {}
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Roll:
@@ -147,16 +219,43 @@ class Roll:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
 
-        rolls = []
-        for i in range(2, len(self.exp)):
-            rolls.append(self.exp[i].evaluate(scope)[1])
+        for i in range(0, len(self.exp)):
+            self.exp[i].generate_tree(id_manager)
 
-        dice = self.exp[1].evaluate(scope)[1]
-        rolls = self.exp[0].evaluate(scope)[1]
+        self.tree = {
+            "type": "roll",
+            "id": self.id,
+            "count": self.exp[0].tree,
+            "dice": self.exp[1].tree,
+            "rolls": list(elem.tree for elem in self.exp[2:])
+        }
 
-        return {"type": "roll", "dice": dice, "value": rolls }, RollBox(rolls, dice, rolls)
+    def evaluate(self, scope, options):
+
+        self.errors = []
+        self.stack = {}
+
+        for i in range(0, len(self.exp)):
+            self.exp[i].evaluate(scope, options)
+            self.errors += self.exp[i].errors
+            self.stack += self.exp[i].errors
+
+        rolls = list(elem.result for elem in self.exp[2:])
+        dice = self.exp[1].result
+        rolls = self.exp[0].result
+
+        try:
+            self.result = RollBox(rolls, dice, rolls)
+        except e:
+            self.errors += [{"description": str(e), "id": self.id}]
+            self.result = None
+
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Array:
@@ -168,14 +267,30 @@ class Array:
             exp = []
         self.exp = exp
 
-    def evaluate(self, scope):
-
-        values = []
-        trees = []
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
 
         for i in range(0, len(self.exp)):
-            data = self.exp[i].evaluate(scope)
-            values.append(data[1])
-            trees.append(data[0])
+            self.exp[i].generate_tree(id_manager)
 
-        return {"type": "array", "content": trees}, ArrayBox(values)
+        self.tree = {
+            "type": "array",
+            "id": self.id,
+            "value": list(elem.tree for elem in self.exp)
+        }
+
+    def evaluate(self, scope, options):
+
+        self.errors = []
+        self.stack = {}
+
+        for i in range(0, len(self.exp)):
+            self.exp[i].evaluate(scope, options)
+            self.errors += self.exp[i].errors
+            self.stack.update(self.exp[i].stack)
+
+        self.result = ArrayBox(list(value.result for value in self.exp))
+
+        self.stack.update({self.id: self.result})
+
+        return self

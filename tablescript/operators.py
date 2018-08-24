@@ -3,6 +3,33 @@ from pypeg2 import *
 from .scope import *
 from .typedefs import *
 
+def passTroughCalc(obj, scope, options):
+
+    if type(obj.exp) == list and len(obj.exp) == 1:
+        obj.exp = obj.exp[0]
+
+    if type(obj.exp) != list:
+        obj.exp.evaluate(scope, options)
+        obj.result = obj.exp.result
+        obj.errors = obj.exp.errors
+        obj.stack = obj.exp.stack
+        return True
+
+    return False
+
+
+def passTroughTree(obj, id_manager):
+
+    if type(obj.exp) == list and len(obj.exp) == 1:
+        obj.exp = obj.exp[0]
+
+    if type(obj.exp) != list:
+        obj.exp.generate_tree(id_manager)
+        obj.tree = obj.exp.tree
+        return True
+
+    return False
+
 
 class Parenthesis:
 
@@ -11,8 +38,24 @@ class Parenthesis:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
-        return self.exp.evaluate(scope)
+    def generate_tree(self, id_manager):
+        self.id = id_manager.get_id()
+        self.exp.generate_tree(id_manager)
+        self.tree = {
+            "type": "parenthesis",
+            "id": self.id,
+            "content": self.exp.tree,
+        }
+
+    def evaluate(self, scope, options):
+        self.exp.evaluate(scope, options)
+
+        self.result = self.exp.result
+        self.errors = self.exp.errors
+        self.stack = {}
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class MemberAccess:
@@ -22,23 +65,53 @@ class MemberAccess:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if type(self.exp) != list:
-            self.exp = [self.exp]
+        if passTroughTree(self, id_manager):
+            return
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        self.id = id_manager.get_id()
 
+        for i in range(0, len(self.exp)):
+            self.exp[i].generate_tree(id_manager)
+
+        self.tree = { "type": "infix", "op": ".", "id": self.id, "left": self.exp[0].tree, "right": self.exp[1].tree }
+
+
+    def evaluate(self, scope, options):
+
+        if passTroughCalc(self, scope, options):
+            return self
         else:
-            v0 = self.exp[0].evaluate(scope)
+            self.errors = []
+            self.stack = {}
 
-            if type(v0[1]) != Scope:
-                raise LookupError("There's no accessible label on the left.")
+            self.exp[0].evaluate(scope, options)
+            self.errors += self.exp[0].errors
+            self.stack.update(self.exp[0].stack)
 
-            v1 = self.exp[1].evaluate(v0[1])
+            if len(self.errors) > 0:
+                self.result = None
+                return self
 
-            return {"type": "infix", "op": "access", "left": v0[0], "right": v1[0]}, v1[1]
+            if type(self.exp[0].result) != Scope:
+                self.errors += [{ "description": "There's no accessible label on the left.", "id": self.id }]
+                self.result = None
+                return self
+
+            self.exp[1].evaluate(self.exp[0].result, options)
+            self.errors += self.exp[1].errors
+            self.stack.update(self.exp[1].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            self.result = self.exp[1].result
+
+            self.stack.update({self.id: self.result})
+
+            return self
 
 
 MemberAccess.grammar = contiguous(Label, optional(".", [MemberAccess, Label]))
@@ -47,112 +120,236 @@ MemberAccess.grammar = contiguous(Label, optional(".", [MemberAccess, Label]))
 class Index:
 
     grammar = TerminalExpression, \
-              optional(
-                  "[",
+              maybe_some(
+                  re.compile(r"\["),
                   [
                       (Expression, re.compile(r':'), Expression),
                       (Expression, re.compile(r':')),
                       (re.compile(r':|\?'), Expression),
                       Expression,
-                  ], "]"
+                  ], re.compile(r"\]")
               )
 
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        arr = self.exp[0].evaluate(scope)
+        self.id = id_manager.get_id()
 
-        if type(arr[1]) != ArrayBox:
-            raise Exception("Expected array as left operand.")
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-        if len(self.exp) == 2:
+        i = 1
+        self.indexes = []
+        for i in range(1, len(self.exp)):
+            if self.exp[i] == "[":
+                self.indexes.append([])
+            elif self.exp[i] == "]":
+                continue
+            else:
+                self.indexes[-1].append(self.exp[i])
 
-            key = self.exp[1].evaluate(scope)
-            value = key[1]
+        for i in range(0, len(self.indexes)):
 
-            if type(value) == RollBox:
-                value = value + IntegerBox(0)
+            curr_index = self.indexes[i]
 
-            return {"type": "postfix", "op": "[]", "left": arr[0], "index": key[0]}, arr[1][value.value]
+            if len(curr_index) == 3 and curr_index[1] == ":":
+                curr_index[0].generate_tree(id_manager)
+                curr_index[2].generate_tree(id_manager)
+                self.tree = {
+                    "type": "postfix",
+                    "op": "[n:n]",
+                    "id": self.id,
+                    "left": self.tree,
+                    "start": curr_index[0].tree,
+                    "end": curr_index[2].tree
+                }
 
+            elif len(curr_index) == 2 and curr_index[1] == ":":
+                curr_index[0].generate_tree(id_manager)
+                self.tree = {
+                    "type": "postfix",
+                    "op": "[n:]",
+                    "id": self.id,
+                    "left": self.tree,
+                    "start": curr_index[0].tree,
+                }
 
-        if len(self.exp) > 2:
+            elif len(curr_index) == 2 and curr_index[0] == ":":
+                curr_index[1].generate_tree(id_manager)
+                self.tree = {
+                    "type": "postfix",
+                    "op": "[:n]",
+                    "id": self.id,
+                    "left": self.tree,
+                    "end": curr_index[1].tree,
+                }
 
-            if self.exp[1] == "?":
+            elif len(curr_index) == 2 and curr_index[0] == "?":
+                curr_index[1].generate_tree(id_manager)
+                self.tree = {
+                    "type": "postfix",
+                    "op": "[?n]",
+                    "id": self.id,
+                    "left": self.tree,
+                    "cond": curr_index[1].tree,
+                }
 
+            elif len(curr_index) == 1:
+                curr_index[0].generate_tree(id_manager)
+                self.tree = {
+                    "type": "postfix",
+                    "op": "[n]",
+                    "id": self.id,
+                    "left": self.tree,
+                    "key": curr_index[0].tree,
+                }
+
+    def evaluate(self, scope, options):
+
+        if passTroughCalc(self, scope, options):
+            return self
+
+        self.errors = []
+        self.stack = {}
+
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = self.exp[0].result
+
+        if type(self.result) != ArrayBox:
+            self.errors += [{ "description": "Expected array as left operand.", "id": self.id }]
+            self.result = None
+            return self
+
+        for i in range(0, len(self.indexes)):
+
+            curr_index = self.indexes[i]
+
+            if len(curr_index) == 1:
+
+                curr_index[0].evaluate(scope, options)
+                self.errors += curr_index[0].errors
+                self.stack += curr_index[0].stack
+
+                if len(self.errors) > 0:
+                    self.result = None
+                    return self
+
+                value = curr_index[0].result
+
+                if type(value) == RollBox:
+                    value = value + IntegerBox(0)
+
+                if type(value) != IntegerBox:
+                    self.errors += [{"description": "Expected an integer result as key.", "id": self.id}]
+                    self.result = None
+                    return self
+
+                self.result = self.result[value.value]
+                self.stack.update({self.id: self.result})
+
+                continue
+
+            if len(curr_index) == 2 and curr_index[0] == "?":
+
+                options["cacheRolls"] = True
                 res = []
-                tree = None
-                for i in range(0, len(arr[1].value)):
-                    arrayScope = Scope({"value": arr[1].value[i], "key": i}).merge(scope)
-                    indexValue = self.exp[2].evaluate(arrayScope)
 
-                    if tree == None:
-                        tree = indexValue[0]
+                for i in range(0, len(self.result.value)):
+                    arrayScope = Scope({"value": self.result.value[i], "key": i}).merge(scope)
 
-                    if type(indexValue[1]) != BooleanBox:
-                        raise Expression("Expected boolean expressione.")
+                    curr_index[1].evaluate(arrayScope, options)
+                    self.errors += curr_index[1].errors
+                    self.stack.update(curr_index[1].stack)
 
-                    if indexValue[1].value:
-                        res.append(arr[1][i])
+                    if len(self.errors) > 0:
+                        self.result = None
+                        return self
 
-                return {"type": "postfix", "op": "[]", "left": arr[0], "index": tree}, ArrayBox(res)
+                    value = curr_index[1].result
 
-            if self.exp[1] == ":":
+                    if type(value) != BooleanBox:
+                        self.errors += [{"description": "Expected a boolean result as condition.", "id": self.id}]
+                        self.result = None
+                        return self
 
-                end = self.exp[2].evaluate(scope)
-                value = end[1]
+                    if value.value:
+                        res.append(self.result[i])
+
+                self.result = ArrayBox(res)
+                self.stack.update({self.id: self.result})
+
+                continue
+
+            if len(curr_index) == 2 and (curr_index[0] == ":" or curr_index[1] == ":"):
+
+                index = 1 if curr_index[0] == ":" else 0
+
+                curr_index[index].evaluate(scope, options)
+                self.errors += curr_index[index].errors
+                self.stack += curr_index[index].stack
+
+                if len(self.errors) > 0:
+                    self.result = None
+                    return self
+
+                value = curr_index[index].result
 
                 if type(value) == RollBox:
                     value = value + IntegerBox(0)
 
-                if type(end[1]) != IntegerBox:
-                    raise Exception("The specified index is not an integer.")
+                if type(value) != IntegerBox:
+                    self.errors += [{"description": "Expected an integer range.", "id": self.id}]
+                    self.result = None
+                    return self
 
-                return {"type": "postfix", "op": "[]", "left": arr[0], "endIndex": end[0]},\
-                       ArrayBox(arr[1].value[:value.value])
+                self.result = ArrayBox(self.result[:-value.value]) if curr_index[1] == ":" else ArrayBox(self.result[value.value:])
+                self.stack.update({self.id: self.result})
 
+                continue
 
-            if self.exp[2] == ":" and len(self.exp) == 3:
+            curr_index[0].evaluate(scope, options)
+            self.errors += curr_index[0].errors
+            self.stack += curr_index[0].stack
 
-                start = self.exp[1].evaluate(scope)
-                value = start[1]
+            curr_index[2].evaluate(scope, options)
+            self.errors += curr_index[2].errors
+            self.stack.update(curr_index[2].stack)
 
-                if type(value) == RollBox:
-                    value = value + IntegerBox(0)
+            if len(self.errors) > 0:
+                self.result = None
+                return self
 
-                if type(start[1]) != IntegerBox:
-                    raise Exception("The specified index is not an integer.")
+            start = curr_index[0].result
+            end = curr_index[2].result
 
-                return {"type": "postfix", "op": "[]", "left": arr[0], "startIndex": start[0]}\
-                    , ArrayBox(arr[1].value[value.value:])
+            if type(start) == RollBox:
+                start = start + IntegerBox(0)
 
-            if self.exp[2] == "|":
-                return
+            if type(end) == RollBox:
+                end = end + IntegerBox(0)
 
-            start = self.exp[1].evaluate(scope)
-            end = self.exp[3].evaluate(scope)
-            startValues = start[1]
-            endValue = end[1]
-
-            if type(startValues) == RollBox:
-                startValues = startValues + IntegerBox(0)
-
-            if type(endValue) == RollBox:
-                endValue = endValue + IntegerBox(0)
-
-            if type(start[1]) != IntegerBox:
+            if type(start) != IntegerBox:
                 raise Exception("Start index is not an integer.")
 
-            if type(end[1]) != IntegerBox:
+            if type(end) != IntegerBox:
                 raise Exception("End index is not an integer.")
 
-            return {"type": "postfix", "op": "[]", "left": arr[0], "startIndex": start[0], "endIndex": end[0]},\
-                   ArrayBox(arr[1].value[startValues.value:endValue.value])
+            self.result = ArrayBox(self.result[start.value:end.value])
+            self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Prefix:
@@ -162,24 +359,51 @@ class Prefix:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
+        self.id = []
 
-            v0 = self.exp[1].evaluate(scope)
-            op = self.exp[0]
+        self.exp[-1].generate_tree(id_manager)
+        self.tree = self.exp[-1].tree
 
-            tree = {"type": "prefix", "op": op, "right": v0[0]}
+        for i in range(2, len(self.exp) + 1):
+            self.id.append(id_manager.get_id())
+            self.tree = {
+                "type": "prefix",
+                "op": self.exp[-i],
+                "id": self.id[-1],
+                "right": self.tree
+            }
+
+    def evaluate(self, scope, options):
+
+        if passTroughCalc(self, scope, options):
+            return self
+
+        self.exp[-1].evaluate(scope, options)
+        self.stack = self.exp[-1].stack
+        self.errors = self.exp[-1].errors
+        self.result = self.exp[-1].result
+
+        id = 1
+
+        for i in range(2, len(self.exp) + 1):
+
+            op = self.exp[-i]
 
             if op == '-':
-                return tree, -v0[1]
+                self.result = -self.result
 
             elif op == '!':
-                return tree, v0[1].inv()
-            #TODO: array per prendere simboli di seguito
+                self.result = self.result.inv()
+
+            self.stack.update({self.id[-id]: self.result})
+            id = id + 1
+
+        return self
 
 
 class RollOperator:
@@ -188,32 +412,76 @@ class RollOperator:
 
     def __init__(self, exp):
         self.exp = exp
+        self.result = None
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if type(self.exp) != list:
-            self.exp = [self.exp]
+        if passTroughTree(self, id_manager):
+            return
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        self.id = id_manager.get_id()
 
-        v1 = self.exp[0].evaluate(scope)
-        v2 = self.exp[1].evaluate(scope)
-        lv = v1[1]
-        rv = v2[1]
+        self.exp[0].generate_tree(id_manager)
+        self.exp[1].generate_tree(id_manager)
 
-        if type(lv) == RollBox:
-            lv = lv + IntegerBox(0)
+        self.tree = {
+            "type": "infix",
+            "op": "d",
+            "id": self.id,
+            "left": self.exp[0].tree,
+            "right": self.exp[1].tree
+        }
 
-        if type(rv) == RollBox:
-            rv = rv + IntegerBox(0)
+    def evaluate(self, scope, options):
 
-        if type(lv) != IntegerBox or type(rv) != IntegerBox:
-            raise Exception("Dice operands must be integer.")
+        if passTroughCalc(self, scope, options):
+            return self
 
-        value = RollBox(lv, rv)
+        self.errors = []
+        self.stack = {}
 
-        return {"type": "infix", "op": "d", "left": v1[0], "right": v2[0], "value": value.value }, value
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        count = self.exp[0].result
+
+        if type(count) == RollBox:
+            count = count + IntegerBox(0)
+
+        if type(count) != IntegerBox:
+            self.errors += [{"description": "Left roll operand must be an integer.", "id": self.id}]
+            self.result = None
+            return self
+
+        self.exp[1].evaluate(scope, options)
+        self.errors += self.exp[1].errors
+        self.stack.update(self.exp[1].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        dice = self.exp[1].result
+
+        if type(dice) == RollBox:
+            dice = dice + IntegerBox(0)
+
+        if type(dice) != IntegerBox:
+            self.errors += [{"description": "Right roll operand must be an integer.", "id": self.id}]
+            self.result = None
+            return self
+
+        if not (options["cacheRolls"] and type(self.result) == RollBox):
+            self.result = RollBox(count, dice)
+
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class ArrayRoll:
@@ -222,32 +490,74 @@ class ArrayRoll:
 
     def __init__(self, exp):
         self.exp = exp
+        self.result = None
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if type(self.exp) != list:
-            self.exp = [self.exp]
+        if passTroughTree(self, id_manager):
+            return
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        self.id = id_manager.get_id()
 
-        v1 = self.exp[0].evaluate(scope)
-        v2 = self.exp[1].evaluate(scope)
-        lv = v1[1]
-        rv = v2[1]
+        self.exp[0].generate_tree(id_manager)
+        self.exp[1].generate_tree(id_manager)
 
-        if type(lv) == RollBox:
-            lv = lv + IntegerBox(0)
+        self.tree = {
+            "type": "infix",
+            "op": "[d]",
+            "id": self.id,
+            "left": self.exp[0].tree,
+            "right": self.exp[1].tree
+        }
 
-        if type(rv) == RollBox:
-            rv = rv + IntegerBox(0)
+    def evaluate(self, scope, options):
 
-        if type(lv) != IntegerBox or type(rv) != IntegerBox:
-            raise Exception("Dice operands must be integer.")
+        if passTroughCalc(self, scope, options):
+            return self
 
-        value = RollBox(lv, rv).toArray()
+        self.errors = []
+        self.stack = {}
 
-        return {"type": "infix", "op": "[d]", "left": v1[0], "right": v2[0], "value": value + IntegerBox(0)}, value
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        count = self.exp[0].result
+
+        if type(count) == RollBox:
+            count = count + IntegerBox(0)
+
+        if type(count) != IntegerBox:
+            self.errors += [{"description": "Left roll operand must be an integer.", "id": self.id}]
+            self.result = None
+            return self
+
+        self.exp[1].evaluate(scope, options)
+        self.errors += self.exp[1].errors
+        self.stack.update(self.exp[1].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        dice = self.exp[1].result
+
+        if type(dice) == RollBox:
+            dice = dice + IntegerBox(0)
+
+        if type(dice) != IntegerBox:
+            self.errors += [{"description": "Right roll operand must be an integer.", "id": self.id}]
+            self.result = None
+            return self
+
+        self.result = RollBox(count, dice).toArray()
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class Merge:
@@ -257,27 +567,62 @@ class Merge:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
-            acc = ArrayBox()
+        self.id = []
 
-            v0 = self.exp[0].evaluate(scope)
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-            acc.append(v0[1])
-            tree = v0[0]
+        for i in range(1, len(self.exp)):
+            self.id.append(id_manager.get_id())
+            self.exp[i].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": "::",
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i].tree
+            }
 
-            for i in range(1, len(self.exp)):
-                v = self.exp[i].evaluate(scope)
+    def evaluate(self, scope, options):
 
-                acc.append(v[1])
-                tree = {"type": "infix", "op": "::", "left": tree, "right": v[0]}
+        if passTroughCalc(self, scope, options):
+            return self
 
-            return (tree, acc)
+        self.result = ArrayBox()
 
+        self.errors = []
+        self.stack = {}
+
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result.append(self.exp[0].result)
+
+        for i in range(1, len(self.exp)):
+
+            self.exp[i].evaluate(scope, options)
+            self.errors += self.exp[i].errors
+            self.stack.update(self.exp[i].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            self.result.append(self.exp[i].result)
+
+            self.stack.update({self.id: self.result})
+
+        return self
 
 class MulDiv:
 
@@ -286,35 +631,104 @@ class MulDiv:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
+        self.id = []
 
-            v0 = self.exp[0].evaluate(scope)
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-            acc = v0[1]
-            tree = v0[0]
+        for i in range(1, len(self.exp), 2):
+            self.id.append(id_manager.get_id())
+            self.exp[i + 1].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": self.exp[i],
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i + 1].tree
+            }
 
-            for i in range(1, len(self.exp), 2):
+    def evaluate(self, scope, options):
 
-                nv = self.exp[i + 1].evaluate(scope)
+        if passTroughCalc(self, scope, options):
+            return self
 
-                if self.exp[i] == '*':
-                    acc = acc * nv[1]
-                    tree = {"type": "infix", "op": "*", "left": tree, "right": nv[0]}
+        self.errors = []
+        self.stack = {}
 
-                elif self.exp[i] == '/':
-                    acc = acc / nv[1]
-                    tree = {"type": "infix", "op": "/", "left": tree, "right": nv[0]}
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
 
-                elif self.exp[i] == '//':
-                    acc = acc // nv[1]
-                    tree = {"type": "infix", "op": "//", "left": tree, "right": nv[0]}
+        if len(self.errors) > 0:
+            self.result = None
+            return self
 
-            return (tree, acc)
+        self.result = self.exp[0].result
+
+        for i in range(1, len(self.exp), 2):
+
+            self.exp[i + 1].evaluate(scope, options)
+            self.errors += self.exp[i + 1].errors
+            self.stack.update(self.exp[i + 1].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            if self.exp[i] == '*':
+                self.result = self.result * self.exp[i + 1].result
+
+            elif self.exp[i] == '/':
+                self.result = self.result / self.exp[i + 1].result
+
+            elif self.exp[i] == '//':
+                self.result = self.result // self.exp[i + 1].result
+
+            self.stack.update({self.id[i // 2]: self.result})
+
+        return self
+
+    def evaluate(self, scope, options):
+
+        if passTroughCalc(self, scope, options):
+            return self
+
+        self.errors = []
+        self.stack = {}
+
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.exp[2].evaluate(scope, options)
+        self.errors += self.exp[2].errors
+        self.stack += self.exp[2].stack
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        if self.exp[1] == '*':
+            self.result = self.exp[0].result * self.exp[2].result
+
+        elif self.exp[1] == '/':
+            self.result = self.exp[0].result / self.exp[2].result
+
+        elif self.exp[1] == '//':
+            self.result = self.exp[0].result // self.exp[2].result
+
+        self.stack.update({self.id: self.result})
+
+        return self
 
 
 class SumSub:
@@ -324,31 +738,64 @@ class SumSub:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
+        self.id = []
 
-            v0 = self.exp[0].evaluate(scope)
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-            acc = v0[1]
-            tree = v0[0]
+        for i in range(1, len(self.exp), 2):
+            self.id.append(id_manager.get_id())
+            self.exp[i + 1].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": self.exp[i],
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i + 1].tree
+            }
 
-            for i in range(1, len(self.exp), 2):
+    def evaluate(self, scope, options):
 
-                nv = self.exp[i + 1].evaluate(scope)
+        if passTroughCalc(self, scope, options):
+            return self
 
-                if self.exp[i] == '+':
-                    acc = acc + nv[1]
-                    tree = {"type": "infix", "op": "+", "left": tree, "right": nv[0]}
+        self.errors = []
+        self.stack = {}
 
-                elif self.exp[i] == '-':
-                    acc = acc - nv[1]
-                    tree = {"type": "infix", "op": "-", "left": tree, "right": nv[0]}
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
 
-            return (tree, acc)
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = self.exp[0].result
+
+        for i in range(1, len(self.exp), 2):
+
+            self.exp[i + 1].evaluate(scope, options)
+            self.errors += self.exp[i + 1].errors
+            self.stack.update(self.exp[i + 1].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            if self.exp[i] == '+':
+                self.result = self.result + self.exp[i + 1].result
+
+            elif self.exp[i] == '-':
+                self.result = self.result - self.exp[i + 1].result
+
+            self.stack.update({self.id[i // 2]: self.result})
+
+        return self
 
 
 class Compare:
@@ -358,38 +805,71 @@ class Compare:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
+        self.id = []
 
-            v0 = self.exp[0].evaluate(scope)
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-            acc = v0[1]
-            tree = v0[0]
+        for i in range(1, len(self.exp), 2):
+            self.id.append(id_manager.get_id())
+            self.exp[i + 1].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": self.exp[i],
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i + 1].tree
+            }
 
-            for i in range(1, len(self.exp), 2):
+    def evaluate(self, scope, options):
 
-                nv = self.exp[i + 1].evaluate(scope)
+        if passTroughCalc(self, scope, options):
+            return self
 
-                tree = {"type": "infix", "op": self.exp[i], "left": tree, "right": nv[0]}
+        self.errors = []
+        self.stack = {}
 
-                if self.exp[i] == '==':
-                    acc = acc == nv[1]
-                elif self.exp[i] == '>=':
-                    acc = acc >= nv[1]
-                elif self.exp[i] == '<=':
-                    acc = acc <= nv[1]
-                elif self.exp[i] == '>':
-                    acc = acc > nv[1]
-                elif self.exp[i] == '<':
-                    acc = acc < nv[1]
-                elif self.exp[i] == '!=':
-                    acc = acc != nv[1]
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
 
-            return tree, acc
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = self.exp[0].result
+
+        for i in range(1, len(self.exp), 2):
+
+            self.exp[i + 1].evaluate(scope, options)
+            self.errors += self.exp[i + 1].errors
+            self.stack.update(self.exp[i + 1].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            if self.exp[i] == '==':
+                self.result = self.result == self.exp[i + 1].result
+            elif self.exp[i] == '>=':
+                self.result = self.result >= self.exp[i + 1].result
+            elif self.exp[i] == '<=':
+                self.result = self.result <= self.exp[i + 1].result
+            elif self.exp[i] == '>':
+                self.result = self.result > self.exp[i + 1].result
+            elif self.exp[i] == '<':
+                self.result = self.result < self.exp[i + 1].result
+            elif self.exp[i] == '!=':
+                self.result = self.result != self.exp[i + 1].result
+
+            self.stack.update({self.id[i // 2]: self.result})
+
+        return self
 
 
 class BoolLogic:
@@ -399,47 +879,110 @@ class BoolLogic:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        else:
+        self.id = []
 
-            v0 = self.exp[0].evaluate(scope)
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
-            acc = v0[1]
-            tree = v0[0]
+        for i in range(1, len(self.exp), 2):
+            self.id.append(id_manager.get_id())
+            self.exp[i + 1].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": self.exp[i],
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i + 1].tree
+            }
 
-            for i in range(1, len(self.exp), 2):
+    def evaluate(self, scope, options):
 
-                nv = self.exp[i + 1].evaluate(scope)
+        if passTroughCalc(self, scope, options):
+            return self
 
-                tree = {"type": "infix", "op": self.exp[i], "left": tree, "right": nv[0]}
+        self.errors = []
+        self.stack = {}
 
-                if self.exp[i] == '||':
-                    acc = acc.orOp(nv[1])
-                elif self.exp[i] == '&&':
-                    acc = acc.andOp(nv[1])
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
 
-            return tree, acc
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = self.exp[0].result
+
+        for i in range(1, len(self.exp), 2):
+
+            self.exp[i + 1].evaluate(scope, options)
+            self.errors += self.exp[i + 1].errors
+            self.stack.update(self.exp[i + 1].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            if self.exp[i] == '||':
+                self.result = self.result.orOp(self.exp[i + 1].result)
+            elif self.exp[i] == '&&':
+                self.result = self.result.andOp(self.exp[i + 1].result)
+
+            self.stack.update({self.id[i // 2]: self.result})
+
+        return self
 
 
 class Naming:
 
-    grammar = separated(BoolLogic, optional(Keyword("as"), validLabels))
+    grammar = separated(BoolLogic, optional(Keyword("as"), ValidLabels))
 
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        expr = self.exp[0].evaluate(scope)
+        if passTroughTree(self, id_manager):
+            return
 
-        if len(self.exp) == 1:
-            return expr
+        self.id = id_manager.get_id()
 
-        return {"type": "infix", "op": "as", "right": expr[0], "left": self.exp[1]}, Scope({self.exp[1]:expr[1]})
+        self.exp[0].generate_tree(id_manager)
+
+        self.tree = {
+            "type": "infix",
+            "op": "as",
+            "id": self.id,
+            "left": self.exp[0].tree,
+            "right": self.exp[1]
+        }
+
+    def evaluate(self, scope, options):
+
+        if passTroughCalc(self, scope, options):
+            return self
+
+        self.errors = []
+        self.stack = {}
+
+        self.exp[0].evaluate(scope, options)
+        self.errors += self.exp[0].errors
+        self.stack.update(self.exp[0].stack)
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = Scope({self.exp[1]:self.exp[0].result})
+        self.stack.update({self.id: self.result})
+
+        return self
+
 
 class ScopeMerge:
 
@@ -448,28 +991,60 @@ class ScopeMerge:
     def __init__(self, exp):
         self.exp = exp
 
-    def evaluate(self, scope):
+    def generate_tree(self, id_manager):
 
-        if type(self.exp) != list:
-            self.exp = [self.exp]
+        if passTroughTree(self, id_manager):
+            return
 
-        if len(self.exp) == 1:
-            return self.exp[0].evaluate(scope)
+        self.id = []
 
-        lb = self.exp[0].evaluate(scope)
-        tree = lb[0]
-
-        if type(lb[1]) != Scope:
-            raise Exception("Cannot use an expression as scope.")
-
-        scope = scope.merge(lb[1])
+        self.exp[0].generate_tree(id_manager)
+        self.tree = self.exp[0].tree
 
         for i in range(1, len(self.exp) - 1):
-            lb = self.exp[i].evaluate(scope)
-            scope = scope.merge(lb[1])
+            self.id.append(id_manager.get_id())
+            self.exp[i].generate_tree(id_manager)
+            self.tree = {
+                "type": "infix",
+                "op": "in",
+                "id": self.id[-1],
+                "left": self.tree,
+                "right": self.exp[i].tree
+            }
 
-            tree = {"operator": "infix", "op": "in", "left": tree, "right": lb[0]}
+    def evaluate(self, scope, options):
 
-        res = self.exp[-1].evaluate(scope)
+        if passTroughCalc(self, scope, options):
+            return self
 
-        return {"operator": "infix", "op": "in", "left": tree, "right": res[0]}, res[1]
+        self.errors = []
+        self.stack = {}
+
+        for i in range(0, len(self.exp) - 1):
+
+            self.exp[i].evaluate(scope, options)
+            self.errors += self.exp[i].errors
+            self.stack.update(self.exp[i].stack)
+
+            if len(self.errors) > 0:
+                self.result = None
+                return self
+
+            if type(self.exp[i].retult) != Scope:
+                raise Exception("Cannot use an expression as scope.")
+
+            scope = scope.merge(self.exp[i].retult)
+            self.stack += [{"value": self.result, "id": self.id[i]}]
+
+        self.exp[-1].evaluate(scope, options)
+        self.errors += self.exp[-1].errors
+        self.stack += self.exp[-1].stack
+
+        if len(self.errors) > 0:
+            self.result = None
+            return self
+
+        self.result = self.exp[-1].result
+        self.stack.update({self.id[-1]: self.result})
+
+        return self
