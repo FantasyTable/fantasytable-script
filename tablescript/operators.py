@@ -240,7 +240,7 @@ class Index:
 
                 curr_index[0].evaluate(scope, options)
                 self.errors += curr_index[0].errors
-                self.stack += curr_index[0].stack
+                self.stack.update(curr_index[0].stack)
 
                 if len(self.errors) > 0:
                     self.result = None
