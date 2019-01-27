@@ -298,7 +298,7 @@ class Index:
 
                 curr_index[index].evaluate(scope, options)
                 self.errors += curr_index[index].errors
-                self.stack += curr_index[index].stack
+                self.stack.update(curr_index[index].stack)
 
                 if len(self.errors) > 0:
                     self.result = None
@@ -321,7 +321,7 @@ class Index:
 
             curr_index[0].evaluate(scope, options)
             self.errors += curr_index[0].errors
-            self.stack += curr_index[0].stack
+            self.stack.update(curr_index[0].stack)
 
             curr_index[2].evaluate(scope, options)
             self.errors += curr_index[2].errors
@@ -711,7 +711,7 @@ class MulDiv:
 
         self.exp[2].evaluate(scope, options)
         self.errors += self.exp[2].errors
-        self.stack += self.exp[2].stack
+        self.stack.update(self.exp[2].stack)
 
         if len(self.errors) > 0:
             self.result = None
@@ -1034,11 +1034,11 @@ class ScopeMerge:
                 raise Exception("Cannot use an expression as scope.")
 
             scope = scope.merge(self.exp[i].retult)
-            self.stack += [{"value": self.result, "id": self.id[i]}]
+            self.stack.update([{"value": self.result, "id": self.id[i]}])
 
         self.exp[-1].evaluate(scope, options)
         self.errors += self.exp[-1].errors
-        self.stack += self.exp[-1].stack
+        self.stack.update(self.exp[-1].stack)
 
         if len(self.errors) > 0:
             self.result = None
