@@ -1,12 +1,19 @@
+from .boxed import Boxed
 
 
-class ArrayBox:
+class ArrayBox(Boxed):
 
     def __init__(self, init=None):
+        super().__init__()
 
         if init is None:
             init = []
         self.value = init.copy()
+
+        self.function("invert", self.inv)
+        self.function("sum", self.sum)
+        self.function("length", self.length)
+        self.function("map", self.map)
 
     def append(self, value):
 
@@ -150,6 +157,23 @@ class ArrayBox:
                     ret[i] = ret[i] // other[i]
 
             return ret
+
+    def sum(self):
+        from .integerbox import IntegerBox
+
+        acc = IntegerBox(0)
+        for elem in self.value:
+            if type(elem) == ArrayBox:
+                elem = elem.sum()
+            acc = acc + elem
+
+        return acc
+
+    def length(self):
+        return len(self.value)
+
+    def map(self, fun):
+        return ArrayBox([fun(value) for value in self.value])
 
     def compare(self, other, op):
         from .floatingbox import FloatingBox

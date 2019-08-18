@@ -13,6 +13,11 @@ class StringBox:
 
         self.value = str(init)
 
+    def __eq__(self, other):
+        from .booleanbox import BooleanBox
+
+        return BooleanBox(str(other) == str(self))
+
     def __add__(self, other):
         return StringBox(self.value + str(other))
 

@@ -43,6 +43,9 @@ class IntegerBox:
         if type(other) == IntegerBox:
             return IntegerBox(self.value + other.value)
 
+        if not other:
+            return IntegerBox(self.value)
+
     def __sub__(self, other):
         from .floatingbox import FloatingBox
         from .arraybox import ArrayBox
@@ -64,6 +67,9 @@ class IntegerBox:
         if type(other) == IntegerBox:
             return IntegerBox(self.value - other.value)
 
+        if not other:
+            return IntegerBox(self.value)
+
     def __mul__(self, other):
         from .floatingbox import FloatingBox
         from .arraybox import ArrayBox
@@ -84,6 +90,9 @@ class IntegerBox:
 
         if type(other) == IntegerBox:
             return IntegerBox(self.value * other.value)
+
+        if not other:
+            return IntegerBox(0)
 
     def __truediv__(self, other):
         from .floatingbox import FloatingBox
@@ -146,6 +155,9 @@ class IntegerBox:
                 ret.append(BooleanBox(self.other < self.value[i]))
             return ret
 
+        if not other:
+            return BooleanBox(self.value < 0)
+
     def __eq__(self, other):
         return (self < other).inv().andOp((other < self).inv())
 
@@ -153,7 +165,9 @@ class IntegerBox:
         return (self < other).orOp(other < self)
 
     def __gt__(self, other):
-        return other < self
+        from .booleanbox import BooleanBox
+
+        return BooleanBox(other < self.value)
 
     def __ge__(self, other):
         return (self < other).inv()

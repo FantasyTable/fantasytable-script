@@ -1,8 +1,8 @@
 from unittest import TestCase
 
-from tablescript.tablescript import eval
-from tablescript.datatypes.integerbox import IntegerBox
-from tablescript.datatypes.floatingbox import FloatingBox
+from game.tablescript import eval
+from game.tablescript.datatypes import IntegerBox
+from game.tablescript.datatypes import FloatingBox
 
 import math
 
