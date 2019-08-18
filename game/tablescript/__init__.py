@@ -28,8 +28,12 @@ class TableScript:
 
     def eval(self, text, scope):
 
-        # - Parse expression structure
-        expression = self.parse(text)
+        try:
+            # - Parse expression structure
+            expression = self.parse(text)
+        except SyntaxError as err:
+            self.errors = [err]
+            return None
 
         # - Get the evaluation tree
         expression.generate_tree(self.id_manager)
@@ -45,7 +49,7 @@ class TableScript:
         self.stack = expression.stack
         self.tree = expression.tree
 
-        return expression.result.value
+        return expression.result
 
     def parse(self, text):
 

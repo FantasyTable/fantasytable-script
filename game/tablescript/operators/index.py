@@ -16,7 +16,7 @@ class Index:
         # - Scatter indices
         self.indexes = []
         if type(exp) is list and len(exp) > 1:
-            for exp in self.exp[1:]:
+            for exp in self.exp:
                 if exp == "[":
                     self.indexes.append([])
                 elif exp == "]":
@@ -36,9 +36,6 @@ class Index:
                 if len(index) == 1:
                     self.indexes[i] = {"op": "[n]", "key": index[0]}
 
-        # - Left value
-        self.target_exp = self.exp[0]
-
         # - Initialize values
         self.id = 0
         self.tree = {}
@@ -47,17 +44,12 @@ class Index:
         self.refs = []
         self.result = None
 
-    def generate_tree(self, id_manager):
-
-        if pass_trough_tree(self, id_manager):
-            return
+    def generate_tree(self, id_manager, input_tree):
 
         # - Set id for this expression
         self.id = id_manager.get_id()
 
-        # - Generate tree for the source array and merge
-        self.target_exp.generate_tree(id_manager)
-        self.tree = self.target_exp.tree
+        self.tree = input_tree
 
         for index in self.indexes:
 
@@ -87,18 +79,10 @@ class Index:
                 index["key"].generate_tree(id_manager)
                 self.tree["key"] = index["key"].tree
 
-    def evaluate(self, scope, options):
-
-        if pass_trough_calc(self, scope, options):
-            return
-
-        # - Evaluate array base and merge
-        self.target_exp.evaluate(scope, options)
-        self.errors += self.target_exp.errors
-        self.stack.update(self.target_exp.stack)
+    def evaluate(self, scope, options, input_scope=None):
 
         # - Set first result value
-        self.result = self.target_exp.result
+        self.result = input_scope
 
         # - Check the array type
         if type(self.result) != ArrayBox:
@@ -217,7 +201,7 @@ class Index:
                         if type(filter) is BooleanBox and filter.value:
                             res.append(item)
 
-                    self.result = res
+                    self.result = ArrayBox(res)
                     return
 
                 # - Try to convert to integer

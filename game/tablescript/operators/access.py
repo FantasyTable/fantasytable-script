@@ -12,9 +12,7 @@ class Access:
         self.exp = exp
 
         # - Get expressions
-        if type(exp) is list and len(exp) > 1:
-            self.context_exp = exp[0]
-            self.access_exp = exp[1]
+        self.access_exp = exp
 
         # - Initialize values
         self.id = 0
@@ -24,16 +22,12 @@ class Access:
         self.refs = {}
         self.result = None
 
-    def generate_tree(self, id_manager):
-
-        if pass_trough_tree(self, id_manager):
-            return
+    def generate_tree(self, id_manager, input_tree):
 
         # - Set id for this expression
         self.id = id_manager.get_id()
 
         # - Generate tree for all expressions
-        self.context_exp.generate_tree(id_manager)
         self.access_exp.generate_tree(id_manager)
 
         self.tree = \
@@ -41,30 +35,20 @@ class Access:
             "type": "infix",
             "op": ".",
             "id": self.id,
-            "left": self.context_exp.tree,
+            "left": input_tree,
             "right": self.access_exp.tree
         }
 
-    def evaluate(self, scope, options):
-
-        if pass_trough_calc(self, scope, options):
-            return
-
-        # - Evaluate and merge context expression
-        self.context_exp.evaluate(scope, options)
-        self.errors += self.context_exp.errors
-        self.stack.update(self.context_exp.stack)
-
-        scope = self.context_exp.result
+    def evaluate(self, scope, options, input_scope=None):
 
         # - Invalid context ?
-        if type(scope) != Scope:
+        if type(input_scope) != Scope:
             scope = convert_type(scope, options["deepScope"])
 
-        if isinstance(scope, Boxed):
-            scope = Scope(scope.scope)
+        if isinstance(input_scope, Boxed):
+            input_scope = Scope(input_scope.scope)
 
-        if type(scope) != Scope:
+        if type(input_scope) != Scope:
             self.errors += [{"description": "There's no accessible label on the left.", "id": self.id}]
             self.result = None
 
@@ -74,7 +58,7 @@ class Access:
             return
 
         # - Evaluate and merge access expression
-        self.access_exp.evaluate(scope, options)
+        self.access_exp.evaluate(input_scope, options)
         self.errors += self.access_exp.errors
         self.stack.update(self.access_exp.stack)
 

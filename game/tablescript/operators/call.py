@@ -11,9 +11,7 @@ class Call:
 
         # - Get expressions
         if type(exp) == list:
-            self.params_exp = exp[2:]
-
-        self.context_exp = exp[0]
+            self.params_exp = exp[1:]
 
         # - Initialize values
         self.id = 0
@@ -23,16 +21,12 @@ class Call:
         self.refs = {}
         self.result = None
 
-    def generate_tree(self, id_manager):
-
-        if pass_trough_tree(self, id_manager):
-            return
+    def generate_tree(self, id_manager, input_tree):
 
         # - Set id for this expression
         self.id = id_manager.get_id()
 
         # - Generate tree for all expressions
-        self.context_exp.generate_tree(id_manager)
         for exp in self.params_exp:
             exp.generate_tree(id_manager)
 
@@ -41,22 +35,14 @@ class Call:
             "type": "postfix",
             "op": "(.)",
             "id": self.id,
-            "target": self.context_exp.tree,
+            "target": input_tree,
             "params": [exp.tree for exp in self.params_exp]
         }
 
-    def evaluate(self, scope, options):
-
-        if pass_trough_calc(self, scope, options):
-            return
-
-        # - Evaluate and merge context expression
-        self.context_exp.evaluate(scope, options)
-        self.errors += self.context_exp.errors
-        self.stack.update(self.context_exp.stack)
+    def evaluate(self, scope, options, input_scope=None):
 
         # - Invalid context ?
-        if not callable(self.context_exp.result):
+        if not callable(input_scope):
             self.errors += [{"description": "The left argument is not a function", "id": self.id}]
             self.result = None
 
@@ -79,7 +65,7 @@ class Call:
 
         try:
             # - Get the result from the called function
-            self.result = self.context_exp.result(*params)
+            self.result = input_scope(*params)
         except IndexError as error:
             self.errors += error.args
         except Exception as ex:

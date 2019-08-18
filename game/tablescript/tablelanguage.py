@@ -27,9 +27,11 @@ from .operators.access import Access
 from .operators.prefix import Prefix
 from .operators.naming import Naming
 from .operators.compare import Compare
+from .operators.accesses import Accesses
 from .operators.arrayroll import ArrayRoll
 from .operators.expression import Expression
 from .operators.parenthesis import Parenthesis
+
 
 # - Label system - All letter combination except boolean and keywords ---------------------------------
 ValidLabels = re.compile(r'(?!\btrue\b|\?|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b|\bfunc\b)^\b([a-zA-Z]\w*)\b')
@@ -61,38 +63,13 @@ AccessTypes = \
 
 # - Operators syntax ----------------------------------------------------------------------------------
 Parenthesis.grammar = "(", Expression, ")"
-Index.grammar = [Terminal, Call, Access], maybe_some(re.compile(r"\["), AccessTypes, re.compile(r"\]"))
-Call.grammar = contiguous([Terminal, Access, Index], optional(re.compile(r'\('), optional((csl(Expression))), ")"))
-Access.grammar = contiguous([Terminal, Call, Index], optional(".", Label))
+Index.grammar = re.compile(r"\["), AccessTypes, re.compile(r"\]")
+Call.grammar = re.compile(r'\('), optional((csl(Expression))), ")"
+Access.grammar = contiguous(".", Label)
 
+Accesses.grammar = contiguous(Terminal, maybe_some([Access, Call, Index]))
 
-Prefix.grammar = maybe_some(re.compile(r'[-!]')), [Index, Call, Access]
-
-RollOp.grammar = [([Integer, Parenthesis], "d", [Integer, Parenthesis]), Prefix]
-ArrayRoll.grammar = [([Integer, Parenthesis], "[d]", [Integer, Parenthesis]), RollOp]
-
-Merge.grammar = ArrayRoll, maybe_some("::", ArrayRoll)
-Mul.grammar = Merge, maybe_some(re.compile(r'\*|//|/'), Merge)
-Sum.grammar = Mul, maybe_some(re.compile(r'[+-]'), Mul)
-Compare.grammar = Sum, maybe_some(re.compile(r'==|>=|<=|>|<|!='), Sum)
-Logic.grammar = Compare, maybe_some(re.compile(r'\|\||&&'), Compare)
-
-Func.grammar = [(re.compile(r"\bfunc\b"), optional(csl(ValidLabels)), ":", Logic), Logic]
-Naming.grammar = separated(Func, optional(Keyword("as"), ValidLabels))
-Scope.grammar = [(maybe_some(Naming, Keyword("in")), Naming), Func]
-
-Expression.grammar = Scope
-# -----------------------------------------------------------------------------------------------------
-
-
-# - Operators syntax ----------------------------------------------------------------------------------
-Parenthesis.grammar = "(", Expression, ")"
-Index.grammar = [Terminal, Call, Access], maybe_some(re.compile(r"\["), AccessTypes, re.compile(r"\]"))
-Call.grammar = contiguous([Terminal, Access, Index], optional(re.compile(r'\('), optional((csl(Expression))), ")"))
-Access.grammar = contiguous([Terminal, Call, Index], optional(".", Label))
-
-
-Prefix.grammar = maybe_some(re.compile(r'[-!]')), [Index, Call, Access]
+Prefix.grammar = maybe_some(re.compile(r'[-!]')), Accesses
 
 RollOp.grammar = [([Integer, Parenthesis], "d", [Integer, Parenthesis]), Prefix]
 ArrayRoll.grammar = [([Integer, Parenthesis], "[d]", [Integer, Parenthesis]), RollOp]
@@ -103,9 +80,9 @@ Sum.grammar = Mul, maybe_some(re.compile(r'[+-]'), Mul)
 Compare.grammar = Sum, maybe_some(re.compile(r'==|>=|<=|>|<|!='), Sum)
 Logic.grammar = Compare, maybe_some(re.compile(r'\|\||&&'), Compare)
 
-Func.grammar = [(re.compile(r"\bfunc\b"), optional(csl(ValidLabels)), ":", Logic), Logic]
+Func.grammar = optional(re.compile(r"\bfunc\b"), optional(csl(ValidLabels)), ":"), [Logic, Func]
 Naming.grammar = separated(Func, optional(Keyword("as"), ValidLabels))
-Scope.grammar = [(maybe_some(Naming, Keyword("in")), Naming), Func]
+Scope.grammar = maybe_some(Naming, Keyword("in")), Func
 
 Expression.grammar = Scope
 # -----------------------------------------------------------------------------------------------------
