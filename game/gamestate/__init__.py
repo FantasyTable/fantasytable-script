@@ -50,7 +50,7 @@ class GameStateManager:
         # - Evaluate script
         result = tablescript.eval(script, scope)
 
-        return result
+        return result.value if result else None
 
     def entity_state(self, metatype, params):
 

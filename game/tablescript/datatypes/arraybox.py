@@ -1,4 +1,5 @@
 from .boxed import Boxed
+from .integerbox import IntegerBox
 
 
 class ArrayBox(Boxed):
@@ -170,7 +171,7 @@ class ArrayBox(Boxed):
         return acc
 
     def length(self):
-        return len(self.value)
+        return IntegerBox(len(self.value))
 
     def map(self, fun):
         return ArrayBox([fun(value) for value in self.value])

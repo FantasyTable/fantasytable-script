@@ -4,14 +4,14 @@ from . import *
 
 class Call:
 
-    def __init__(self, exp):
+    def __init__(self, exp=[]):
 
         # - Set expression
         self.exp = exp
 
         # - Get expressions
         if type(exp) == list:
-            self.params_exp = exp[1:]
+            self.params_exp = exp
 
         # - Initialize values
         self.id = 0

@@ -64,10 +64,10 @@ AccessTypes = \
 # - Operators syntax ----------------------------------------------------------------------------------
 Parenthesis.grammar = "(", Expression, ")"
 Index.grammar = re.compile(r"\["), AccessTypes, re.compile(r"\]")
-Call.grammar = re.compile(r'\('), optional((csl(Expression))), ")"
+Call.grammar = [("(", ")"), ("(", optional(csl(Expression)), ")")]
 Access.grammar = contiguous(".", Label)
 
-Accesses.grammar = contiguous(Terminal, maybe_some([Access, Call, Index]))
+Accesses.grammar = contiguous(Terminal, maybe_some([Access, Index, Call]))
 
 Prefix.grammar = maybe_some(re.compile(r'[-!]')), Accesses
 

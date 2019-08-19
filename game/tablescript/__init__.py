@@ -25,7 +25,6 @@ class TableScript:
         # - A global id counter
         self.id_manager = IdManager()
 
-
     def eval(self, text, scope):
 
         try:
