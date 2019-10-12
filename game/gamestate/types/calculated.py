@@ -8,4 +8,5 @@ def parse_calculated(schema):
     # - Get the script
     script = schema["_script_"]
 
+    # - Calculate the script result
     return script

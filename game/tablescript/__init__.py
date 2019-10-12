@@ -3,6 +3,8 @@ from pypeg2 import *
 from .utils import *
 from game.tablescript.datatypes.scope import *
 
+from .result import TResult
+
 
 class TableScript:
 
@@ -48,7 +50,7 @@ class TableScript:
         self.stack = expression.stack
         self.tree = expression.tree
 
-        return expression.result
+        return TResult(self.result, self.errors, self.stack, self.tree)
 
     def parse(self, text):
 

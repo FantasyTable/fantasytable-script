@@ -43,7 +43,13 @@ class Access:
 
         # - Invalid context ?
         if type(input_scope) != Scope:
-            scope = convert_type(scope, options["deepScope"])
+            scope, errors = convert_type(scope, options["deepScope"], options["externalCall"], self.id)
+            self.errors += errors
+
+            # - Abort if errors
+            if len(self.errors) > 0:
+                self.result = None
+                return
 
         if isinstance(input_scope, Boxed):
             input_scope = Scope(input_scope.scope)

@@ -39,16 +39,9 @@ class Label:
         # - Get the variable value
         value = scope.value[self.label_name]
 
-        try:
-            # - Try to convert to a language type the variable
-            self.result = convert_type(value, options["deepScope"])
-        except:
-            self.errors += \
-            [{
-                "description": "Unable to convert the variable: " + self.label_name,
-                "id": self.id
-            }]
-            self.result = None
+        # - Try to convert to a language type the variable
+        self.result, errors = convert_type(value, options["deepScope"], options["externalCall"], self.id)
+        self.errors += errors
 
         # - Update the stack
         self.stack.update({self.id: self.result})

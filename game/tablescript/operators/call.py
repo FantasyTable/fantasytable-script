@@ -1,5 +1,4 @@
-from ..datatypes.scope import Scope
-from . import *
+from ..datatypes import *
 
 
 class Call:
@@ -61,11 +60,13 @@ class Call:
             self.result = None
             return
 
-        params = [param.result for param in self.params_exp]
+        params = [param.result.value for param in self.params_exp]
 
         try:
             # - Get the result from the called function
             self.result = input_scope(*params)
+            self.result, errors = convert_type(self.result, options["deepScope"], options["externalCall"], self.id)
+            self.errors += errors
         except IndexError as error:
             self.errors += error.args
         except Exception as ex:

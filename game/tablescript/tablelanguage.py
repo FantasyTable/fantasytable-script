@@ -7,6 +7,7 @@ from pypeg2 import *
 from .terminals.roll import Roll
 from .terminals.label import Label
 from .terminals.string import String
+from .terminals.struct import Struct
 from .terminals.integer import Integer
 from .terminals.boolean import Boolean
 from .terminals.decimal import Decimal
@@ -30,25 +31,27 @@ from .operators.compare import Compare
 from .operators.accesses import Accesses
 from .operators.arrayroll import ArrayRoll
 from .operators.expression import Expression
+from .operators.ifstatement import IfStatement
 from .operators.parenthesis import Parenthesis
 
 
 # - Label system - All letter combination except boolean and keywords ---------------------------------
-ValidLabels = re.compile(r'(?!\btrue\b|\?|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b|\bfunc\b)^\b([a-zA-Z]\w*)\b')
+ValidLabels = re.compile(r'(?!\btrue\b|\?|\bTrue\b|\bfalse\b|\bFalse\b|\bin\b|\bas\b|\bfunc\b)^([a-zA-Z$]\w*)')
 # -----------------------------------------------------------------------------------------------------
 
 # - Terminal values -----------------------------------------------------------------------------------
 Label.grammar = ValidLabels
 Integer.grammar = re.compile(r'\d+')
 Decimal.grammar = re.compile(r'\d+\.\d+')
-String.grammar = re.compile(r'[\"\'](\\.|[^\\"])*[\"\']')
-Array.grammar = [("[", csl(Expression), "]"), "[]"]
+String.grammar = re.compile(r'[\"\'](\\.|[^\\"\\\'])*[\"\']')
 Boolean.grammar = re.compile(r'true|false|True|False')
-Roll.grammar = "<", Integer, "d", Integer, "|", Integer, maybe_some(",", Integer), ">"
+Roll.grammar = separated("<", Integer, "d", Integer, "|", csl(Integer), ">")
+Array.grammar = separated([("[", "]"), ("[", optional(csl(Expression)), "]")])
+Struct.grammar = separated("{", optional(csl(ValidLabels, ":", Expression)), "}")
 # -----------------------------------------------------------------------------------------------------
 
 # - Terminal expression statement ---------------------------------------------------------------------
-Terminal.grammar = [Roll, Decimal, Integer, Boolean, String, Array, Parenthesis, Label]
+Terminal.grammar = [Roll, Decimal, Integer, Boolean, String, Array, Struct, Parenthesis, Label]
 # -----------------------------------------------------------------------------------------------------
 
 # - Access types --------------------------------------------------------------------------------------
@@ -62,9 +65,9 @@ AccessTypes = \
 # -----------------------------------------------------------------------------------------------------
 
 # - Operators syntax ----------------------------------------------------------------------------------
-Parenthesis.grammar = "(", Expression, ")"
-Index.grammar = re.compile(r"\["), AccessTypes, re.compile(r"\]")
-Call.grammar = [("(", ")"), ("(", optional(csl(Expression)), ")")]
+Parenthesis.grammar = separated("(", Expression, ")")
+Index.grammar = separated(re.compile(r"\["), AccessTypes, re.compile(r"\]"))
+Call.grammar = separated([("(", ")"), ("(", optional(csl(Expression)), ")")])
 Access.grammar = contiguous(".", Label)
 
 Accesses.grammar = contiguous(Terminal, maybe_some([Access, Index, Call]))
@@ -80,7 +83,9 @@ Sum.grammar = Mul, maybe_some(re.compile(r'[+-]'), Mul)
 Compare.grammar = Sum, maybe_some(re.compile(r'==|>=|<=|>|<|!='), Sum)
 Logic.grammar = Compare, maybe_some(re.compile(r'\|\||&&'), Compare)
 
-Func.grammar = optional(re.compile(r"\bfunc\b"), optional(csl(ValidLabels)), ":"), [Logic, Func]
+IfStatement.grammar = Logic, optional("?", Expression, ":", Expression)
+
+Func.grammar = optional(re.compile(r"\bfunc\b"), optional(csl(ValidLabels)), ":"), IfStatement
 Naming.grammar = separated(Func, optional(Keyword("as"), ValidLabels))
 Scope.grammar = maybe_some(Naming, Keyword("in")), Func
 
