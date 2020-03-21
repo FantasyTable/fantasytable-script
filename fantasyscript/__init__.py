@@ -1,12 +1,12 @@
-from .tablelanguage import TableLanguage
 from pypeg2 import *
-from .utils import *
-from game.tablescript.datatypes.scope import *
 
+from .tablelanguage import TableLanguage
 from .result import TResult
+from .utils import *
+from .datatypes.scope import *
 
 
-class TableScript:
+class FantasyScript:
 
     def __init__(self, configs=None):
 

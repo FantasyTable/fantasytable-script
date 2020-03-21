@@ -11,7 +11,7 @@ from .helpers.json import *
 from game.tablescript import *
 
 
-class GameStateManager:
+class FantasyMarkup:
 
     def __init__(self, game, store):
 
