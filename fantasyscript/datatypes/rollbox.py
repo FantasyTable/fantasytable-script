@@ -6,7 +6,7 @@ class RollBox:
     def __init__(self, *params):
 
         if len(params) == 1 and type(params[0]) == RollBox:
-            self.value = params[0].value
+            self._value = params[0]._value
             self.dice = params[0].dice
 
         if len(params) >= 2:
@@ -24,13 +24,13 @@ class RollBox:
                 if len(params[2]) != params[0].value:
                     raise Exception("Array size doesn't corresponds to the first parameter.")
 
-                self.value = params[2]
+                self._value = params[2]
 
             if len(params) == 2:
-                self.value = []
+                self._value = []
 
                 for i in range(0, params[0].value):
-                    self.value.append(random.randint(1, self.dice + 1))
+                    self._value.append(random.randint(1, self.dice + 1))
 
     def toArray(self):
         from .arraybox import ArrayBox
@@ -38,13 +38,17 @@ class RollBox:
 
         ret = ArrayBox()
 
-        for i in range(0, len(self.value)):
-            ret.append(RollBox(IntegerBox(1), IntegerBox(self.dice), [self.value[i]]))
+        for i in range(0, len(self._value)):
+            ret.append(RollBox(IntegerBox(1), IntegerBox(self.dice), [self._value[i]]))
 
         return ret
 
+    @property
+    def value(self):
+        return sum(self._value)
+
     def __neg__(self):
-        return -sum(self.value)
+        return -sum(self._value)
 
     def __add__(self, other):
         from .floatingbox import FloatingBox
@@ -52,16 +56,16 @@ class RollBox:
         from .arraybox import ArrayBox
 
         if type(other) == RollBox:
-            return IntegerBox(sum(self.value) + sum(other.value))
+            return IntegerBox(sum(self._value) + sum(other.value))
 
         if type(other) == IntegerBox:
-            return IntegerBox(sum(self.value) + other.value)
+            return IntegerBox(sum(self._value) + other.value)
 
         if type(other) == FloatingBox:
-            return FloatingBox(sum(self.value) + other.value)
+            return FloatingBox(sum(self._value) + other.value)
 
         if type(other) == ArrayBox:
-            return IntegerBox(sum(self.value)) + other
+            return IntegerBox(sum(self._value)) + other
 
     def __sub__(self, other):
         from .floatingbox import FloatingBox
@@ -69,16 +73,16 @@ class RollBox:
         from .arraybox import ArrayBox
 
         if type(other) == RollBox:
-            return IntegerBox(sum(self.value) - sum(other.value))
+            return IntegerBox(sum(self._value) - sum(other.value))
 
         if type(other) == IntegerBox:
-            return IntegerBox(sum(self.value) - other.value)
+            return IntegerBox(sum(self._value) - other.value)
 
         if type(other) == FloatingBox:
-            return FloatingBox(sum(self.value) - other.value)
+            return FloatingBox(sum(self._value) - other.value)
 
         if type(other) == ArrayBox:
-            return IntegerBox(sum(self.value)) - other
+            return IntegerBox(sum(self._value)) - other
 
     def __mul__(self, other):
         from .floatingbox import FloatingBox
@@ -86,16 +90,16 @@ class RollBox:
         from .arraybox import ArrayBox
 
         if type(other) == RollBox:
-            return IntegerBox(sum(self.value) * sum(other.value))
+            return IntegerBox(sum(self._value) * sum(other.value))
 
         if type(other) == IntegerBox:
-            return IntegerBox(sum(self.value) * other.value)
+            return IntegerBox(sum(self._value) * other.value)
 
         if type(other) == FloatingBox:
-            return FloatingBox(sum(self.value) * other.value)
+            return FloatingBox(sum(self._value) * other.value)
 
         if type(other) == ArrayBox:
-            return IntegerBox(sum(self.value)) * other
+            return IntegerBox(sum(self._value)) * other
 
     def __truediv__(self, other):
         from .floatingbox import FloatingBox
@@ -103,16 +107,16 @@ class RollBox:
         from .arraybox import ArrayBox
 
         if type(other) == RollBox:
-            return IntegerBox(sum(self.value) / sum(other.value))
+            return IntegerBox(sum(self._value) / sum(other.value))
 
         if type(other) == IntegerBox:
-            return IntegerBox(sum(self.value) / other.value)
+            return IntegerBox(sum(self._value) / other.value)
 
         if type(other) == FloatingBox:
-            return FloatingBox(sum(self.value) / other.value)
+            return FloatingBox(sum(self._value) / other.value)
 
         if type(other) == ArrayBox:
-            return IntegerBox(sum(self.value)) / other
+            return IntegerBox(sum(self._value)) / other
 
     def __floordiv__(self, other):
         from .floatingbox import FloatingBox
@@ -120,16 +124,16 @@ class RollBox:
         from .arraybox import ArrayBox
 
         if type(other) == RollBox:
-            return IntegerBox(sum(self.value) // sum(other.value))
+            return IntegerBox(sum(self._value) // sum(other.value))
 
         if type(other) == IntegerBox:
-            return IntegerBox(sum(self.value) // other.value)
+            return IntegerBox(sum(self._value) // other.value)
 
         if type(other) == FloatingBox:
-            return FloatingBox(sum(self.value) // other.value)
+            return FloatingBox(sum(self._value) // other.value)
 
         if type(other) == ArrayBox:
-            return IntegerBox(sum(self.value)) // other
+            return IntegerBox(sum(self._value)) // other
 
     def __lt__(self, other):
         from .floatingbox import FloatingBox
@@ -139,15 +143,15 @@ class RollBox:
         from .rollbox import RollBox
 
         if type(other) == RollBox:
-            return BooleanBox(sum(self.value) < sum(other.value))
+            return BooleanBox(sum(self._value) < sum(other.value))
 
         if type(other) == FloatingBox or type(other) == IntegerBox:
-            return BooleanBox(sum(self.value) < other.value)
+            return BooleanBox(sum(self._value) < other.value)
 
         if type(other) == ArrayBox:
             ret = ArrayBox()
-            for i in range(0, len(self.value)):
-                ret.append(other < self.value[i])
+            for i in range(0, len(self._value)):
+                ret.append(other < self._value[i])
             return ret
 
     def __eq__(self, other):
@@ -167,8 +171,8 @@ class RollBox:
 
     def __repr__(self):
 
-        nums = str(self.value[0])
-        for i in range(1, len(self.value)):
-            nums = nums + ", " + str(self.value[i])
+        nums = str(self._value[0])
+        for i in range(1, len(self._value)):
+            nums = nums + ", " + str(self._value[i])
 
-        return "<" + str(len(self.value)) + "d" + str(self.dice) + "| " + nums + ">"
+        return "<" + str(len(self._value)) + "d" + str(self.dice) + "| " + nums + ">"
