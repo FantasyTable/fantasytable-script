@@ -81,7 +81,6 @@ class Sum:
                 return
 
             if op == '+':
-
                 self.result = self.result + self.values_exp[i + 1].result
 
             elif op == '-':

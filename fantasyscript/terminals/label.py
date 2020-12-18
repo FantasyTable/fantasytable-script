@@ -40,10 +40,17 @@ class Label:
         value = scope.value[self.label_name]
 
         # - Try to convert to a language type the variable
-        self.result, errors = convert_type(value, options["deepScope"], options["externalCall"], self.id)
+        self.result, errors, stack, tree = convert_type(value, options["deepScope"], options["externalCall"], self.id)
         self.errors += errors
 
         # - Update the stack
         self.stack.update({self.id: self.result})
+
+        if stack is not {}:
+            self.stack.update(stack)
+
+        if tree is not {}:
+            self.tree["type"] = "calculated"
+            self.tree["internal"] = tree
 
         return self

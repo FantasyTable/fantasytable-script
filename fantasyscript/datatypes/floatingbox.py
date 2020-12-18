@@ -31,7 +31,7 @@ class FloatingBox:
             return FloatingBox(self.value + other.value)
 
         if type(other) == RollBox:
-            return FloatingBox(self.value + sum(other.value))
+            return FloatingBox(self.value + other.value)
 
         if type(other) == ArrayBox:
             ret = ArrayBox(other.value)

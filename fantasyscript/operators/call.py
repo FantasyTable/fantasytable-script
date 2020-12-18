@@ -60,13 +60,15 @@ class Call:
             self.result = None
             return
 
-        params = [param.result.value for param in self.params_exp]
+        params = [param.result for param in self.params_exp]
 
         try:
             # - Get the result from the called function
             self.result = input_scope(*params)
-            self.result, errors = convert_type(self.result, options["deepScope"], options["externalCall"], self.id)
+            self.result, errors, stack, tree = convert_type(self.result, options["deepScope"], options["externalCall"], self.id)
             self.errors += errors
+            self.stack.update(stack)
+            self.tree["internal"] = tree
         except IndexError as error:
             self.errors += error.args
         except Exception as ex:

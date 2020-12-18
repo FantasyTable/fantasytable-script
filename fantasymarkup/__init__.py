@@ -8,7 +8,7 @@ from .types.array import *
 
 from .helpers.json import *
 
-from game.tablescript import *
+from ..fantasyscript import *
 
 
 class FantasyMarkup:
@@ -54,7 +54,7 @@ class FantasyMarkup:
         type = entity["type"]
         cache = entity["cache"]
 
-        # - Improve performance by caching
+        # - Improve performance using a cache
         if cache:
             return cache
 
@@ -104,7 +104,7 @@ class FantasyMarkup:
 
             def evaluation_fun(context):
                 # - Instantiate the parser
-                tablescript = TableScript({'externalCall': lambda x: self.actions[x]})
+                tablescript = FantasyScript({'externalCall': lambda x: self.actions[x]})
 
                 # - Prepare the scope
                 scope = {}
@@ -189,7 +189,7 @@ class FantasyMarkup:
         self_obj = obj if not self_obj else self_obj
 
         if callable(obj):
-            return obj({'self': self_obj, '$': root})
+            return obj({'self': self_obj, '$': root}).value.value
 
         if type(obj) == dict:
             result = {}
@@ -264,7 +264,7 @@ class FantasyMarkup:
             # - Execute all scripts
             for script in scripts:
                 # - Instantiate the parser
-                tablescript = TableScript({'externalCall': lambda x: self.actions[x]})
+                tablescript = FantasyScript({'externalCall': lambda x: self.actions[x]})
 
                 # - Prepare the scope
                 scope = {}
@@ -325,7 +325,7 @@ class FantasyMarkup:
     def query(self, script, additional_scope={}):
 
         # - Instantiate the parser
-        tablescript = TableScript({'externalCall': lambda x: self.actions[x]})
+        tablescript = FantasyScript({'externalCall': lambda x: self.actions[x]})
 
         # - Prepare the scope
         scope = {}

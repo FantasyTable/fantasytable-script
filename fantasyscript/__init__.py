@@ -1,6 +1,6 @@
 from pypeg2 import *
 
-from .tablelanguage import TableLanguage
+from .fantasylanguage import TableLanguage
 from .result import TResult
 from .utils import *
 from .datatypes.scope import *
@@ -14,6 +14,7 @@ class FantasyScript:
         {
             "cacheRolls": False,
             "calculateStack": True,
+            "externalCall": None
         }
 
         if configs:
@@ -28,6 +29,8 @@ class FantasyScript:
         self.id_manager = IdManager()
 
     def eval(self, text, scope):
+
+        print(text)
 
         try:
             # - Parse expression structure

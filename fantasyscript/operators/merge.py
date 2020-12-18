@@ -68,4 +68,4 @@ class Merge:
             self.result.append(exp.result)
 
             # - Update the evaluation stack
-            self.stack.update({self.id[i // 2]: self.result})
+            self.stack.update({self.id[-1]: self.result})
